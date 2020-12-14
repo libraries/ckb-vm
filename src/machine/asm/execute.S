@@ -169,22 +169,22 @@
   ja .exit_out_of_bound
 
 #define ZEROED_MEMORY \
-  PREPCALL; \
   MOV_TEMP1_TO_ARG1; \
   shl $CKB_VM_ASM_MEMORY_FRAME_SHIFTS, ARG1; \
   addq $CKB_VM_ASM_ASM_CORE_MACHINE_OFFSET_MEMORY, ARG1; \
   addq MACHINE, ARG1; \
   xor ARG2, ARG2; \
   movq $CKB_VM_ASM_MEMORY_FRAMESIZE, ARG3; \
-  CALL_MEMSET; \
-  POSTCALL;
+  CALL_MEMSET;
 
 #ifdef IS_WINDOWS
 #define RANDOM_MEMORY \
-  PREPCALL; \
+  push MACHINE; \
+  push TEMP1;\
   mov CHAOS_SEED, ARG1; \
   call srand; \
-  POSTCALL; \
+  pop TEMP1; \
+  pop MACHINE; \
   shl $CKB_VM_ASM_MEMORY_FRAME_SHIFTS, TEMP1; \
   addq $CKB_VM_ASM_ASM_CORE_MACHINE_OFFSET_MEMORY, TEMP1; \
   addq MACHINE, TEMP1; \
@@ -192,20 +192,20 @@
 5: \
   cmp $0, %rcx; \
   je 6f; \
-  PREPCALL; \
+  push TEMP1; \
+  push %rcx; \
   call rand; \
-  mov %al, %r15b; \
-  POSTCALL; \
-  mov %r15b, (TEMP1); \
+  pop %rcx; \
+  pop TEMP1; \
+  mov %al, (TEMP1); \
   sub $1, %rcx; \
   add $1, TEMP1; \
   jmp 5b; \
 6: \
-  PREPCALL; \
+  push MACHINE; \
   call rand; \
-  mov %eax, %r15d; \
-  POSTCALL; \
-  mov %r15d, CHAOS_SEED;
+  pop MACHINE; \
+  mov %eax, CHAOS_SEED;
 #else
 #define RANDOM_MEMORY \
   shl $CKB_VM_ASM_MEMORY_FRAME_SHIFTS, TEMP1; \
@@ -215,13 +215,16 @@
 5: \
   cmp $0, %rcx; \
   je 6f; \
-  PREPCALL; \
+  push MACHINE; \
+  push TEMP1; \
+  push %rcx; \
   movq MACHINE, ARG1; \
   addq $CKB_VM_ASM_ASM_CORE_MACHINE_OFFSET_CHAOS_SEED, ARG1; \
   CALL_RAND_R; \
-  mov %al, %r15b; \
-  POSTCALL; \
-  mov %r15b, (TEMP1); \
+  pop %rcx; \
+  pop TEMP1; \
+  pop MACHINE; \
+  mov %al, (TEMP1); \
   sub $1, %rcx; \
   add $1, TEMP1; \
   jmp 5b; \
@@ -232,6 +235,7 @@
  * Make sure TEMP1 stores the frame index.
  */
 #define INITED_MEMORY \
+  PREPCALL; \
   movzbl CKB_VM_ASM_ASM_CORE_MACHINE_OFFSET_CHAOS_MODE(MACHINE), TEMP2d; \
   cmp $0, TEMP2d; \
   jne 3f; \
@@ -239,7 +243,8 @@
   jmp 4f; \
 3: \
   RANDOM_MEMORY; \
-4:
+4: \
+  POSTCALL
 
 #define CHECK_READ(address_reg, length) \
   movq address_reg, TEMP1; \
